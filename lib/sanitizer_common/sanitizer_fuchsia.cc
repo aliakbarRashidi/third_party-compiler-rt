@@ -480,6 +480,11 @@ uptr ReadLongProcessName(/*out*/ char *buf, uptr buf_len) {
 
 uptr MainThreadStackBase, MainThreadStackSize;
 
+bool GetRandom(void *buffer, uptr length) {
+  memset(buffer, 'A', length);
+  return true;
+}
+
 }  // namespace __sanitizer
 
 using namespace __sanitizer;  // NOLINT

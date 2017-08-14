@@ -35,7 +35,7 @@ static uptr Cookie;
 // at compilation or at runtime.
 static atomic_uint8_t HashAlgorithm = { CRC32Software };
 
-INLINE u32 computeCRC32(uptr Crc, uptr Value, uptr *Array, uptr ArraySize) {
+INLINE u32 computeCRC32(u32 Crc, uptr Value, uptr *Array, uptr ArraySize) {
   // If the hardware CRC32 feature is defined here, it was enabled everywhere,
   // as opposed to only for scudo_crc32.cpp. This means that other hardware
   // specific instructions were likely emitted at other places, and as a
@@ -87,7 +87,8 @@ struct ScudoChunk : UnpackedHeader {
     ZeroChecksumHeader.Checksum = 0;
     uptr HeaderHolder[sizeof(UnpackedHeader) / sizeof(uptr)];
     memcpy(&HeaderHolder, &ZeroChecksumHeader, sizeof(HeaderHolder));
-    u32 Crc = computeCRC32(Cookie, reinterpret_cast<uptr>(this), HeaderHolder,
+    u32 Crc = computeCRC32(static_cast<u32>(Cookie),
+                           reinterpret_cast<uptr>(this), HeaderHolder,
                            ARRAY_SIZE(HeaderHolder));
     return static_cast<u16>(Crc);
   }
@@ -307,7 +308,7 @@ struct ScudoAllocator {
         1 << MostSignificantSetBitIndex(SizeClassMap::kMaxSize - MinAlignment);
     uptr MaxOffset =
         (MaxPrimaryAlignment - AlignedChunkHeaderSize) >> MinAlignmentLog;
-    Header.Offset = MaxOffset;
+    Header.Offset = MaxOffset & 0xffff;
     if (Header.Offset != MaxOffset) {
       dieWithMessage("ERROR: the maximum possible offset doesn't fit in the "
                      "header\n");
@@ -318,7 +319,7 @@ struct ScudoAllocator {
     // last and last class sizes, as well as the dynamic base for the Primary.
     // The following is an over-approximation that works for our needs.
     uptr MaxSizeOrUnusedBytes = SizeClassMap::kMaxSize - 1;
-    Header.SizeOrUnusedBytes = MaxSizeOrUnusedBytes;
+    Header.SizeOrUnusedBytes = MaxSizeOrUnusedBytes & 0x7ffff;
     if (Header.SizeOrUnusedBytes != MaxSizeOrUnusedBytes) {
       dieWithMessage("ERROR: the maximum possible unused bytes doesn't fit in "
                      "the header\n");
@@ -417,14 +418,14 @@ struct ScudoAllocator {
       CHECK(FromPrimary);
       UserBeg = RoundUpTo(UserBeg, Alignment);
       uptr Offset = UserBeg - AlignedChunkHeaderSize - AllocBeg;
-      Header.Offset = Offset >> MinAlignmentLog;
+      Header.Offset = static_cast<u16>(Offset >> MinAlignmentLog);
     }
     CHECK_LE(UserBeg + Size, AllocBeg + AllocSize);
     Header.State = ChunkAllocated;
-    Header.AllocType = Type;
+    Header.AllocType = Type & 0x3;
     if (FromPrimary) {
       Header.FromPrimary = 1;
-      Header.SizeOrUnusedBytes = Size;
+      Header.SizeOrUnusedBytes = Size & 0x7ffff;
     } else {
       // The secondary fits the allocations to a page, so the amount of unused
       // bytes is the difference between the end of the user allocation and the
@@ -432,7 +433,7 @@ struct ScudoAllocator {
       uptr PageSize = GetPageSizeCached();
       uptr TrailingBytes = (UserBeg + Size) & (PageSize - 1);
       if (TrailingBytes)
-        Header.SizeOrUnusedBytes = PageSize - TrailingBytes;
+        Header.SizeOrUnusedBytes = (PageSize - TrailingBytes) & 0x7ffff;
     }
     Header.Salt = Salt;
     getScudoChunk(UserBeg)->storeHeader(&Header);
@@ -557,7 +558,7 @@ struct ScudoAllocator {
         (UsableSize - NewSize) < (SizeClassMap::kMaxSize / 2)) {
       UnpackedHeader NewHeader = OldHeader;
       NewHeader.SizeOrUnusedBytes =
-                OldHeader.FromPrimary ? NewSize : UsableSize - NewSize;
+          (OldHeader.FromPrimary ? NewSize : UsableSize - NewSize) & 0x7ffff;
       Chunk->compareExchangeHeader(&NewHeader, &OldHeader);
       return OldPtr;
     }

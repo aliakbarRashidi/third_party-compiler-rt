@@ -22,6 +22,8 @@
 #include "sanitizer_common/sanitizer_linux.h"
 #include "sanitizer_common/sanitizer_platform.h"
 
+#include <pthread.h>
+
 namespace __scudo {
 
 // Platform specific base thread context definitions.
@@ -40,6 +42,7 @@ void initThread();
 
 // Platform specific dastpath functions definitions.
 #include "scudo_tls_android.inc"
+#include "scudo_tls_fuchsia.inc"
 #include "scudo_tls_linux.inc"
 
 }  // namespace __scudo

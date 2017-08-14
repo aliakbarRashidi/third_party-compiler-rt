@@ -18,8 +18,8 @@
 
 #include "sanitizer_common/sanitizer_allocator.h"
 
-#if !SANITIZER_LINUX
-# error "The Scudo hardened allocator is currently only supported on Linux."
+#if !SANITIZER_LINUX && !SANITIZER_FUCHSIA
+# error "The Scudo allocator is currently only supported on this platform."
 #endif
 
 namespace __scudo {

@@ -18,7 +18,7 @@
 # error "This file must be included inside scudo_tls.h."
 #endif  // SCUDO_TLS_H_
 
-#if SANITIZER_LINUX && !SANITIZER_ANDROID
+#if (SANITIZER_LINUX && !SANITIZER_ANDROID) || SANITIZER_FUCHSIA
 
 struct ScudoThreadContextPlatform {
   ALWAYS_INLINE void unlock() {}

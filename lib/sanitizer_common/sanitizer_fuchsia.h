@@ -16,16 +16,16 @@
 #include "sanitizer_platform.h"
 #if SANITIZER_FUCHSIA
 
-#include "sanitizer_common.h"
-
 #include <magenta/sanitizer.h>
 
-namespace __sanitizer {
+#include "sanitizer_common.h"
 
-extern uptr MainThreadStackBase, MainThreadStackSize;
-extern sanitizer_shadow_bounds_t ShadowBounds;
+	namespace __sanitizer {
 
-}  // namespace __sanitizer
+	extern uptr MainThreadStackBase, MainThreadStackSize;
+	extern sanitizer_shadow_bounds_t ShadowBounds;
 
-#endif  // SANITIZER_FUCHSIA
-#endif  // SANITIZER_FUCHSIA_H
+	}  // namespace __sanitizer
+
+	#endif  // SANITIZER_FUCHSIA
+	#endif  // SANITIZER_FUCHSIA_H
