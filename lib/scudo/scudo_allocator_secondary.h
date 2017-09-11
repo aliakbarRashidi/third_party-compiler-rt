@@ -23,6 +23,7 @@
 
 class ScudoLargeMmapAllocator {
  public:
+  ReservedAddressRange address_range;
 
   void Init() {
     PageSize = GetPageSizeCached();
@@ -39,7 +40,7 @@ class ScudoLargeMmapAllocator {
     // Account for 2 guard pages, one before and one after the chunk.
     MapSize += 2 * PageSize;
 
-    uptr MapBeg = reinterpret_cast<uptr>(MmapNoAccess(MapSize));
+    uptr MapBeg = reinterpret_cast<uptr>(address_range.Init(MapSize));
     if (MapBeg == ~static_cast<uptr>(0))
       return ReturnNullOrDieOnFailure::OnOOM();
     // A page-aligned pointer is assumed after that, so check it now.
@@ -78,7 +79,7 @@ class ScudoLargeMmapAllocator {
     CHECK_LE(UserEnd, MapEnd - PageSize);
     // Actually mmap the memory, preserving the guard pages on either side.
     CHECK_EQ(MapBeg + PageSize, reinterpret_cast<uptr>(
-        MmapFixedOrDie(MapBeg + PageSize, MapSize - 2 * PageSize)));
+        address_range.Map(PageSize, MapSize - 2 * PageSize)));
     uptr Ptr = UserBeg - AlignedChunkHeaderSize;
     SecondaryHeader *Header = getHeader(Ptr);
     Header->MapBeg = MapBeg;

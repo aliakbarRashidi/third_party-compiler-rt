@@ -59,7 +59,10 @@ static void ProtectGap(uptr addr, uptr size) {
                              "unprotected gap shadow");
     return;
   }
-  void *res = MmapFixedNoAccess(addr, size, "shadow gap");
+  // Since Fuchsia doesn't use this InitializeShadowMemory, we can just
+  // create new "address ranges" ad-hoc.
+  ReservedAddressRange protectgap_address_range;
+  void *res = protectgap_address_range.Init(addr, size, "shadow gap");
   if (addr == (uptr)res) return;
   // A few pages at the start of the address space can not be protected.
   // But we really want to protect as much as possible, to prevent this memory
@@ -69,14 +72,14 @@ static void ProtectGap(uptr addr, uptr size) {
     while (size > step && addr < kZeroBaseMaxShadowStart) {
       addr += step;
       size -= step;
-      void *res = MmapFixedNoAccess(addr, size, "shadow gap");
+      void *res = protectgap_address_range.Init(addr, size, "shadow gap");
       if (addr == (uptr)res) return;
     }
   }
 
   Report(
       "ERROR: Failed to protect the shadow gap. "
-      "ASan cannot proceed correctly. ABORTING.\n");
+      "ASAN cannot proceed correctly. ABORTING.\n");
   DumpProcessMap();
   Die();
 }

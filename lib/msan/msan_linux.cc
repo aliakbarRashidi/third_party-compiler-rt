@@ -55,14 +55,18 @@ static bool CheckMemoryRangeAvailability(uptr beg, uptr size) {
 
 static bool ProtectMemoryRange(uptr beg, uptr size, const char *name) {
   if (size > 0) {
-    void *addr = MmapFixedNoAccess(beg, size, name);
+    // TODO(flowerhack): This is "fine" for Linux but the general approach will
+    // need to be refactored when porting to Fuchsia, since dropping the
+    // address_range handle is no bueno there.
+    ReservedAddressRange msan_address_range;
+    void *addr = msan_address_range.Init(beg, size, name);
     if (beg == 0 && addr) {
       // Depending on the kernel configuration, we may not be able to protect
       // the page at address zero.
       uptr gap = 16 * GetPageSizeCached();
       beg += gap;
       size -= gap;
-      addr = MmapFixedNoAccess(beg, size, name);
+      addr = msan_address_range.Init(beg, size, name);
     }
     if ((uptr)addr != beg) {
       uptr end = beg + size - 1;

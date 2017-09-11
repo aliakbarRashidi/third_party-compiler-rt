@@ -73,10 +73,10 @@ class SizeClassAllocator64 {
     uptr TotalSpaceSize = kSpaceSize + AdditionalSize();
     if (kUsingConstantSpaceBeg) {
       CHECK_EQ(kSpaceBeg, reinterpret_cast<uptr>(
-                              MmapFixedNoAccess(kSpaceBeg, TotalSpaceSize)));
+                              address_range.Init(TotalSpaceSize, kSpaceBeg)));
     } else {
       NonConstSpaceBeg =
-          reinterpret_cast<uptr>(MmapNoAccess(TotalSpaceSize));
+          reinterpret_cast<uptr>(address_range.Init(TotalSpaceSize));
       CHECK_NE(NonConstSpaceBeg, ~(uptr)0);
     }
     SetReleaseToOSIntervalMs(release_to_os_interval_ms);
@@ -151,7 +151,7 @@ class SizeClassAllocator64 {
     if (kUsingConstantSpaceBeg)
       return reinterpret_cast<uptr>(p) & ~(kRegionSize - 1);
     uptr space_beg = SpaceBeg();
-    return ((reinterpret_cast<uptr>(p)  - space_beg) & ~(kRegionSize - 1)) +
+    return ((reinterpret_cast<uptr>(p) - space_beg) & ~(kRegionSize - 1)) +
         space_beg;
   }
 
@@ -295,6 +295,7 @@ class SizeClassAllocator64 {
   static const uptr kNumClassesRounded = SizeClassMap::kNumClassesRounded;
 
  private:
+  ReservedAddressRange address_range;
   static const uptr kRegionSize = kSpaceSize / kNumClassesRounded;
   // FreeArray is the array of free-d chunks (stored as 4-byte offsets).
   // In the worst case it may reguire kRegionSize/SizeClassMap::kMinSize
@@ -387,18 +388,20 @@ class SizeClassAllocator64 {
                                            kFreeArraySize);
   }
 
-  bool MapWithCallback(uptr beg, uptr size) {
-    uptr mapped = reinterpret_cast<uptr>(MmapFixedOrDieOnFatalError(beg, size));
-    if (UNLIKELY(!mapped))
-      return false;
-    CHECK_EQ(beg, mapped);
-    MapUnmapCallback().OnMap(beg, size);
+  bool MapWithCallback(uptr addr, uptr size) {
+    uptr offset = addr - SpaceBeg();
+    uptr mapped = reinterpret_cast<uptr>(address_range.Map(offset, size));
+    if (UNLIKELY(!mapped)) return false;
+    CHECK_EQ(addr, mapped);
+    MapUnmapCallback().OnMap(addr, size);
     return true;
   }
 
-  void MapWithCallbackOrDie(uptr beg, uptr size) {
-    CHECK_EQ(beg, reinterpret_cast<uptr>(MmapFixedOrDie(beg, size)));
-    MapUnmapCallback().OnMap(beg, size);
+  void MapWithCallbackOrDie(uptr addr, uptr size) {
+    // Convert addr into an offset.
+    uptr offset = addr - SpaceBeg();
+    CHECK_EQ(addr, reinterpret_cast<uptr>(address_range.Map(offset, size)));
+    MapUnmapCallback().OnMap(addr, size);
   }
 
   void UnmapWithCallbackOrDie(uptr beg, uptr size) {
@@ -415,7 +418,11 @@ class SizeClassAllocator64 {
       uptr current_map_end = reinterpret_cast<uptr>(GetFreeArray(region_beg)) +
                              region->mapped_free_array;
       uptr new_map_size = new_mapped_free_array - region->mapped_free_array;
-      if (UNLIKELY(!MapWithCallback(current_map_end, new_map_size)))
+      if (UNLIKELY(
+           !MapWithCallback(
+             current_map_end -
+             reinterpret_cast<uptr>(address_range.get_base()),
+             new_map_size)))
         return false;
       region->mapped_free_array = new_mapped_free_array;
     }

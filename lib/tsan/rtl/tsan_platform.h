@@ -21,6 +21,7 @@
 
 #include "tsan_defs.h"
 #include "tsan_trace.h"
+#include "sanitizer_common/sanitizer_common.h"
 
 namespace __tsan {
 

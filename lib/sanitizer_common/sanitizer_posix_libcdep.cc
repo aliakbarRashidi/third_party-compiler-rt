@@ -337,18 +337,19 @@ void *MmapFixedNoReserve(uptr fixed_addr, uptr size, const char *name) {
   return (void *)p;
 }
 
-void *MmapFixedNoAccess(uptr fixed_addr, uptr size, const char *name) {
+void *ReservedAddressRange::Init(uptr size, uptr fixed_addr, const char *name) {
   int fd = name ? GetNamedMappingFd(name, size) : -1;
   unsigned flags = MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE;
-  if (fd == -1) flags |= MAP_ANON;
+  if (fd == -1) flags |= MAP_ANONYMOUS;
 
-  return (void *)internal_mmap((void *)fixed_addr, size, PROT_NONE, flags, fd,
-                               0);
-}
-
-void *MmapNoAccess(uptr size) {
-  unsigned flags = MAP_PRIVATE | MAP_ANON | MAP_NORESERVE;
-  return (void *)internal_mmap(nullptr, size, PROT_NONE, flags, -1, 0);
+  void *res =
+      (void *)internal_mmap((void *)fixed_addr, size, PROT_NONE, flags, fd, 0);
+  if (!res) {
+    return res;
+  }
+  this->base_ = res;
+  this->size_ = size;
+  return res;
 }
 
 // This function is defined elsewhere if we intercepted pthread_attr_getstack.

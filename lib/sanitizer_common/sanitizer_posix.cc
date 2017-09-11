@@ -98,18 +98,17 @@ void *MmapAlignedOrDieOnFatalError(uptr size, uptr alignment,
     UnmapOrDie((void*)map_res, res - map_res);
   }
   uptr end = res + size;
-  if (end != map_end)
-    UnmapOrDie((void*)end, map_end - end);
-  return (void*)res;
+  if (end != map_end) UnmapOrDie((void *)end, map_end - end);
+  return (void *)res;
 }
 
 void *MmapNoReserveOrDie(uptr size, const char *mem_type) {
   uptr PageSize = GetPageSizeCached();
-  uptr p = internal_mmap(nullptr,
-                         RoundUpTo(size, PageSize),
-                         PROT_READ | PROT_WRITE,
-                         MAP_PRIVATE | MAP_ANON | MAP_NORESERVE,
-                         -1, 0);
+  uptr p =
+      internal_mmap(nullptr,
+                    RoundUpTo(size, PageSize),
+                    PROT_READ | PROT_WRITE,
+                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
   int reserrno;
   if (UNLIKELY(internal_iserror(p, &reserrno)))
     ReportMmapFailureAndDie(size, mem_type, "allocate noreserve", reserrno);
@@ -117,32 +116,29 @@ void *MmapNoReserveOrDie(uptr size, const char *mem_type) {
   return (void *)p;
 }
 
-void *MmapFixedImpl(uptr fixed_addr, uptr size, bool tolerate_enomem) {
+void *ReservedAddressRange::get_base() { return this->base_; }
+
+void *ReservedAddressRange::map_impl(uptr offset, uptr map_size,
+                                     bool tolerate_enomem) {
+  uptr fixed_addr = offset + reinterpret_cast<uptr>(get_base());
   uptr PageSize = GetPageSizeCached();
-  uptr p = internal_mmap((void*)(fixed_addr & ~(PageSize - 1)),
-      RoundUpTo(size, PageSize),
-      PROT_READ | PROT_WRITE,
-      MAP_PRIVATE | MAP_ANON | MAP_FIXED,
-      -1, 0);
+  uptr p = internal_mmap((void *)(fixed_addr & ~(PageSize - 1)),
+                         RoundUpTo(map_size, PageSize), PROT_READ | PROT_WRITE,
+                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
   int reserrno;
   if (UNLIKELY(internal_iserror(p, &reserrno))) {
-    if (tolerate_enomem && reserrno == ENOMEM)
-      return nullptr;
+    if (tolerate_enomem && reserrno == ENOMEM) return nullptr;
     char mem_type[40];
     internal_snprintf(mem_type, sizeof(mem_type), "memory at address 0x%zx",
                       fixed_addr);
-    ReportMmapFailureAndDie(size, mem_type, "allocate", reserrno);
+    ReportMmapFailureAndDie(map_size, mem_type, "allocate", reserrno);
   }
-  IncreaseTotalMmap(size);
+  IncreaseTotalMmap(map_size);
   return (void *)p;
 }
 
-void *MmapFixedOrDie(uptr fixed_addr, uptr size) {
-  return MmapFixedImpl(fixed_addr, size, false /*tolerate_enomem*/);
-}
-
-void *MmapFixedOrDieOnFatalError(uptr fixed_addr, uptr size) {
-  return MmapFixedImpl(fixed_addr, size, true /*tolerate_enomem*/);
+void *ReservedAddressRange::Map(uptr offset, uptr size, bool tolerate_enomem) {
+  return map_impl(offset, size, tolerate_enomem);
 }
 
 bool MprotectNoAccess(uptr addr, uptr size) {

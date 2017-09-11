@@ -21,6 +21,7 @@
 #include "msan_interface_internal.h"
 #include "msan_flags.h"
 #include "ubsan/ubsan_platform.h"
+#include "sanitizer_common/sanitizer_common.h"
 
 #ifndef MSAN_REPLACE_OPERATORS_NEW_AND_DELETE
 # define MSAN_REPLACE_OPERATORS_NEW_AND_DELETE 1

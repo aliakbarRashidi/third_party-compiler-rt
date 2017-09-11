@@ -17,10 +17,10 @@
 
 #define WIN32_LEAN_AND_MEAN
 #define NOGDI
-#include <windows.h>
 #include <io.h>
 #include <psapi.h>
 #include <stdlib.h>
+#include <windows.h>
 
 #include "sanitizer_common.h"
 #include "sanitizer_dbghelp.h"
@@ -164,7 +164,7 @@ void *MmapAlignedOrDieOnFatalError(uptr size, uptr alignment,
   // If we got it right on the first try, return. Otherwise, unmap it and go to
   // the slow path.
   if (IsAligned(mapped_addr, alignment))
-    return (void*)mapped_addr;
+    return (void *)mapped_addr;
   if (VirtualFree((void *)mapped_addr, 0, MEM_RELEASE) == 0)
     ReportMmapFailureAndDie(size, mem_type, "deallocate", GetLastError());
 
@@ -222,28 +222,17 @@ void *MmapFixedNoReserve(uptr fixed_addr, uptr size, const char *name) {
   return p;
 }
 
-// Memory space mapped by 'MmapFixedOrDie' must have been reserved by
-// 'MmapFixedNoAccess'.
-void *MmapFixedOrDie(uptr fixed_addr, uptr size) {
-  void *p = VirtualAlloc((LPVOID)fixed_addr, size,
-      MEM_COMMIT, PAGE_READWRITE);
+void *ReservedAddressRange::Map(uptr size, uptr fixed_addr,
+                                bool tolerate_enomem) {
+  void *p = VirtualAlloc((LPVOID)fixed_addr, size, MEM_COMMIT, PAGE_READWRITE);
   if (p == 0) {
     char mem_type[30];
     internal_snprintf(mem_type, sizeof(mem_type), "memory at address 0x%zx",
                       fixed_addr);
+    if (tolerate_enomem) {
+      return ReturnNullptrOnOOMOrDie(size, mem_type, "allocate");
+    }
     ReportMmapFailureAndDie(size, mem_type, "allocate", GetLastError());
-  }
-  return p;
-}
-
-void *MmapFixedOrDieOnFatalError(uptr fixed_addr, uptr size) {
-  void *p = VirtualAlloc((LPVOID)fixed_addr, size,
-      MEM_COMMIT, PAGE_READWRITE);
-  if (p == 0) {
-    char mem_type[30];
-    internal_snprintf(mem_type, sizeof(mem_type), "memory at address 0x%zx",
-                      fixed_addr);
-    return ReturnNullptrOnOOMOrDie(size, mem_type, "allocate");
   }
   return p;
 }
@@ -253,23 +242,18 @@ void *MmapNoReserveOrDie(uptr size, const char *mem_type) {
   return MmapOrDie(size, mem_type);
 }
 
-void *MmapFixedNoAccess(uptr fixed_addr, uptr size, const char *name) {
-  (void)name; // unsupported
-  void *res = VirtualAlloc((LPVOID)fixed_addr, size,
-                           MEM_RESERVE, PAGE_NOACCESS);
+void *ReservedAddressRange::Init(uptr size, uptr fixed_addr = nullptr,
+                                 const char *name = nullptr) {
+  (void)name;  // unsupported
+  void *res =
+      VirtualAlloc((LPVOID)fixed_addr, size, MEM_RESERVE, PAGE_NOACCESS);
   if (res == 0)
-    Report("WARNING: %s failed to "
-           "mprotect %p (%zd) bytes at %p (error code: %d)\n",
-           SanitizerToolName, size, size, fixed_addr, GetLastError());
-  return res;
-}
-
-void *MmapNoAccess(uptr size) {
-  void *res = VirtualAlloc(nullptr, size, MEM_RESERVE, PAGE_NOACCESS);
-  if (res == 0)
-    Report("WARNING: %s failed to "
-           "mprotect %p (%zd) bytes (error code: %d)\n",
-           SanitizerToolName, size, size, GetLastError());
+    Report(
+        "WARNING: %s failed to "
+        "mprotect %p (%zd) bytes at %p (error code: %d)\n",
+        SanitizerToolName, size, size, fixed_addr, GetLastError());
+  size_ = size;
+  base_ = res;
   return res;
 }
 

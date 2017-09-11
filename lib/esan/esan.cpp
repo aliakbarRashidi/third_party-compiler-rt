@@ -144,6 +144,9 @@ static bool verifyShadowScheme() {
 uptr VmaSize;
 
 static void initializeShadow() {
+  // TODO(flowerhack): Refactor this code to use ReservedAddressRange properly
+  // (keep it around after init)
+  ReservedAddressRange esan_address_range;
   verifyAddressSpace();
 
   // This is based on the assumption that the intial stack is always allocated
@@ -167,10 +170,10 @@ static void initializeShadow() {
     if (__esan_which_tool == ESAN_WorkingSet) {
       // We want to identify all shadow pages that are touched so we start
       // out inaccessible.
-      Map = (uptr)MmapFixedNoAccess(ShadowStart, ShadowEnd- ShadowStart,
+      Map = (uptr)esan_address_range.Init(ShadowStart, ShadowEnd- ShadowStart,
                                     "shadow");
     } else {
-      Map = (uptr)MmapFixedNoReserve(ShadowStart, ShadowEnd - ShadowStart,
+      Map = (uptr)esan_address_range.Init(ShadowStart, ShadowEnd - ShadowStart,
                                      "shadow");
     }
     if (Map != ShadowStart) {

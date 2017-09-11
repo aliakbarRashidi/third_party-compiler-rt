@@ -83,6 +83,22 @@ void GetThreadStackAndTls(bool main, uptr *stk_addr, uptr *stk_size,
                           uptr *tls_addr, uptr *tls_size);
 
 // Memory management
+// This class relies on zero-initialization.
+class ReservedAddressRange {
+ public:
+  // Can't use nullptr as an argument b/c nullptr is incompatible with
+  // __sanitizer::uptr
+  void *Init(uptr size, uptr fixed_addr = (uptr)0, const char *name = nullptr);
+  void *Map(uptr offset, uptr size, bool tolerate_enomem = false);
+  void *get_base();
+
+ private:
+  void *map_impl(uptr offset, uptr size, bool tolerate_enomem);
+  void *os_cookie_;
+  void *base_;
+  uptr size_;
+};
+
 void *MmapOrDie(uptr size, const char *mem_type, bool raw_report = false);
 INLINE void *MmapOrDieQuietly(uptr size, const char *mem_type) {
   return MmapOrDie(size, mem_type, /*raw_report*/ true);
@@ -98,8 +114,6 @@ void *MmapFixedOrDie(uptr fixed_addr, uptr size);
 // Behaves just like MmapFixedOrDie, but tolerates out of memory condition, in
 // that case returns nullptr.
 void *MmapFixedOrDieOnFatalError(uptr fixed_addr, uptr size);
-void *MmapFixedNoAccess(uptr fixed_addr, uptr size, const char *name = nullptr);
-void *MmapNoAccess(uptr size);
 // Map aligned chunk of address space; size and alignment are powers of two.
 // Dies on all but out of memory errors, in the latter case returns nullptr.
 void *MmapAlignedOrDieOnFatalError(uptr size, uptr alignment,
@@ -195,12 +209,12 @@ void RemoveANSIEscapeSequencesFromString(char *buffer);
 void Printf(const char *format, ...);
 void Report(const char *format, ...);
 void SetPrintfAndReportCallback(void (*callback)(const char *));
-#define VReport(level, ...)                                              \
-  do {                                                                   \
+#define VReport(level, ...)                                \
+  do {                                                     \
     if ((uptr)Verbosity() >= (level)) Report(__VA_ARGS__); \
   } while (0)
-#define VPrintf(level, ...)                                              \
-  do {                                                                   \
+#define VPrintf(level, ...)                                \
+  do {                                                     \
     if ((uptr)Verbosity() >= (level)) Printf(__VA_ARGS__); \
   } while (0)
 
@@ -297,7 +311,7 @@ bool RemoveDieCallback(DieCallbackType callback);
 void SetUserDieCallback(DieCallbackType callback);
 
 typedef void (*CheckFailedCallbackType)(const char *, int, const char *,
-                                       u64, u64);
+                                        u64, u64);
 void SetCheckFailedCallback(CheckFailedCallbackType callback);
 
 // Callback will be called if soft_rss_limit_mb is given and the limit is
@@ -780,7 +794,7 @@ INLINE uptr GetPthreadDestructorIterations() {
 #endif
 }
 
-void *internal_start_thread(void(*func)(void*), void *arg);
+void *internal_start_thread(void (*func)(void *), void *arg);
 void internal_join_thread(void *th);
 void MaybeStartBackgroudThread();
 

@@ -105,10 +105,14 @@ void InitializeShadowMemory() {
 }
 
 static void ProtectRange(uptr beg, uptr end) {
+  ReservedAddressRange tsan_address_range;
   CHECK_LE(beg, end);
   if (beg == end)
     return;
-  if (beg != (uptr)MmapFixedNoAccess(beg, end - beg)) {
+  // TODO(flowerhack): when/if TSAN is ported to Fuchsia, we'll need an
+  // interface that doesn't drop address_range on the floor once we exit
+  // this function
+  if (beg != (uptr)tsan_address_range.Init(beg, end - beg)) {
     Printf("FATAL: ThreadSanitizer can not protect [%zx,%zx]\n", beg, end);
     Printf("FATAL: Make sure you are not using unlimited stack\n");
     Die();

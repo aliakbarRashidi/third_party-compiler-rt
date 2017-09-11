@@ -421,6 +421,7 @@ static void dfsan_fini() {
 }
 
 static void dfsan_init(int argc, char **argv, char **envp) {
+  ReservedAddressRange dfsan_address_range;
   InitializeFlags();
 
   InitializePlatformEarly();
@@ -434,7 +435,9 @@ static void dfsan_init(int argc, char **argv, char **envp) {
   // case by disabling memory protection when ASLR is disabled.
   uptr init_addr = (uptr)&dfsan_init;
   if (!(init_addr >= UnusedAddr() && init_addr < AppAddr()))
-    MmapFixedNoAccess(UnusedAddr(), AppAddr() - UnusedAddr());
+    // TODO(flowerhack): Refactor this interface to use ReservedAddressRange
+    // properly, e.g. not dropping it on the floor after the function ends
+    dfsan_address_range.Init(UnusedAddr(), AppAddr() - UnusedAddr());
 
   InitializeInterceptors();
 
