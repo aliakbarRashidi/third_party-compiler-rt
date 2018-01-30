@@ -1,0 +1,8 @@
+{
+    "languages": [
+        "cpp"
+    ],
+    "packages": {
+        "fuzzer": "//third_party/compiler-rt/lib/fuzzer"
+    }
+}

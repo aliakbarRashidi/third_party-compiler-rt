@@ -1,0 +1,75 @@
+# Copyright 2016 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/package.gni")
+
+config("fuzz_config") {
+  include_dirs = [ 
+    ".",
+    "//third_party/gtest/include",
+  ]
+}
+
+source_set("lib") {
+  sources = [
+    "FuzzerClangCounters.cpp",
+    "FuzzerCrossOver.cpp",
+    "FuzzerDriver.cpp",
+    "FuzzerExtFunctionsDlsym.cpp",
+    "FuzzerExtFunctionsDlsymWin.cpp",
+    "FuzzerExtFunctionsWeak.cpp",
+    "FuzzerExtraCounters.cpp",
+    "FuzzerIO.cpp",
+    "FuzzerIOPosix.cpp",
+    "FuzzerIOWindows.cpp",
+    "FuzzerLoop.cpp",
+    "FuzzerMerge.cpp",
+    "FuzzerMutate.cpp",
+    "FuzzerSHA1.cpp",
+    "FuzzerShmemFuchsia.cpp",
+    "FuzzerShmemPosix.cpp",
+    "FuzzerShmemWindows.cpp",
+    "FuzzerTracePC.cpp",
+    "FuzzerUtil.cpp",
+    "FuzzerUtilDarwin.cpp",
+    "FuzzerUtilFuchsia.cpp",
+    "FuzzerUtilLinux.cpp",
+    "FuzzerUtilPosix.cpp",
+    "FuzzerUtilWindows.cpp",
+  ]
+  public_deps = [
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+executable("unittests") {
+  testonly = true
+  output_name = "fuzzer_test"
+  configs += [ ":fuzz_config" ]
+  sources = [
+    "tests/FuzzerUnittest.cpp",
+  ]
+  deps = [
+    ":lib",
+    "//third_party/gtest",
+  ]
+  libs = [ 
+    "launchpad",
+    "pthread",
+  ]
+}
+
+package("fuzzer") {
+  testonly = true
+  system_image = true
+
+  deps = [
+    ":unittests",
+  ]
+
+  tests = [ {
+        name = "fuzzer_test"
+      } ]
+}
